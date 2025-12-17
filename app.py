@@ -10,7 +10,7 @@ from scipy.spatial.distance import braycurtis, jaccard
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Fytobentos Kort & Statistik", layout="wide")
 
-st.title("🌿 Fytobentos Data Explorer")
+st.title("Fytobentos Data Explorer")
 
 # -----------------------------------------------------------------------------
 # 2. DATA LOADER FUNKTION
@@ -84,14 +84,14 @@ if data is None or data.empty:
 # 3. FANER (TABS)
 # -----------------------------------------------------------------------------
 
-tab1, tab2, tab3 = st.tabs(["🗺️ Kort & Oversigt", "📈 Tidsudvikling (Station)", "🪨 Substrat Analyse"])
+tab1, tab2, tab3 = st.tabs(["Kort & Oversigt", "Tidsudvikling/Forskelle (Station)", "Substrat forskelle"])
 
 # =============================================================================
 # FANE 1: KORT & OVERSIGT
 # =============================================================================
 with tab1:
     # --- FILTRERING ---
-    with st.expander("🔎 Filtreringsmuligheder", expanded=True):
+    with st.expander("Filtreringsmuligheder", expanded=True):
         # Række 1: De overordnede filtre
         c1, c2 = st.columns([1, 2])
         with c1:
@@ -422,3 +422,4 @@ with tab3:
         
 
         st.plotly_chart(fig_pref, use_container_width=True)
+
