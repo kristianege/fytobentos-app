@@ -10,7 +10,7 @@ from scipy.spatial.distance import braycurtis, jaccard
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Fytobentos Kort & Statistik", layout="wide")
 
-st.title("Fytobentos Data Explorer")
+st.title("Fytobentos Data")
 
 # -----------------------------------------------------------------------------
 # 2. DATA LOADER FUNKTION
@@ -422,4 +422,5 @@ with tab3:
         
 
         st.plotly_chart(fig_pref, use_container_width=True)
+
 
