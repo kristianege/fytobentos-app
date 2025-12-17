@@ -152,9 +152,21 @@ with tab1:
             size_max=25,
             hover_name="Lokation_Visning",
             hover_data={"Art latin": True, "Relativ_Forekomst": ":.2f", "År": True},
-            zoom=5, mapbox_style="open-street-map", height=500
+            zoom=5, 
+            
+            # ÆNDRING 1: Vi skifter til 'carto-positron' (virker bedre interactively)
+            mapbox_style="carto-positron", 
+            
+            height=500
         )
-        st.plotly_chart(fig_map, use_container_width=True)
+        
+        # ÆNDRING 2: Vi tilføjer config={'scrollZoom': True}
+        # Dette tvinger kortet til at acceptere zoom med musehjulet/fingre
+        st.plotly_chart(
+            fig_map, 
+            use_container_width=True, 
+            config={'scrollZoom': True, 'displayModeBar': True}
+        )
 
         # Bar Chart
         st.subheader("Artsfordeling (Median for valgte data)")
@@ -408,4 +420,5 @@ with tab3:
         )
         fig_pref.update_layout(xaxis_tickangle=-45)
         
+
         st.plotly_chart(fig_pref, use_container_width=True)
