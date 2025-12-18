@@ -167,49 +167,7 @@ with tab1:
             use_container_width=True, 
             config={'scrollZoom': True, 'displayModeBar': True}
         )
-st.divider()
 
-        # --- NY GRAF: HYPPIGHED (Antal Registreringer) ---
-        st.subheader("Arts-hyppighed (Antal registreringer)")
-        st.markdown("Grafen viser, hvor mange prøver hver art er fundet i (uanset mængden i prøven).")
-
-        if not df_map.empty:
-            # 1. Tæl hvor mange gange hver art optræder i datasættet
-            # Hver række i df_map er én observation af en art i en prøve.
-            frequency_counts = df_map['Art latin'].value_counts().reset_index()
-            frequency_counts.columns = ['Art latin', 'Antal_Registreringer']
-            
-            # 2. Sortering (Største øverst)
-            # Plotly tegner nedefra og op, så vi sorterer ascending=True for at få største tal i toppen
-            frequency_counts = frequency_counts.sort_values('Antal_Registreringer', ascending=True)
-
-            # 3. Dynamisk højde
-            antal_arter_freq = len(frequency_counts)
-            hojde_freq = max(400, antal_arter_freq * 25)
-
-            with st.container(height=500):
-                fig_freq = px.bar(
-                    frequency_counts,
-                    x='Antal_Registreringer',
-                    y='Art latin',
-                    orientation='h',
-                    text_auto=True, # Viser tallet ude for enden af søjlen
-                    title="Antal fund pr. art",
-                    labels={'Antal_Registreringer': 'Antal prøver med fund', 'Art latin': 'Art'},
-                    height=hojde_freq
-                )
-                
-                fig_freq.update_layout(
-                    yaxis_title="", 
-                    xaxis_title="Antal registreringer",
-                    margin=dict(l=10, r=10, t=30, b=10)
-                )
-                
-                st.plotly_chart(fig_freq, use_container_width=True)
-        else:
-            st.info("Ingen data at vise.")
-            
-        st.divider()
         # Bar Chart
         st.subheader("Artsfordeling (Median for valgte data)")
         
