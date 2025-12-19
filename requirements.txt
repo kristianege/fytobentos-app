@@ -4,3 +4,4 @@ plotly
 pyproj
 scipy
 pyarrow
+scikit-learn
