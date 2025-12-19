@@ -1,15 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import numpy as np
 from pyproj import Transformer
 from scipy.spatial.distance import braycurtis
 from scipy.spatial.distance import braycurtis, jaccard
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from scipy.spatial.distance import pdist, squareform
-from sklearn.manifold import MDS # Vi bruger MDS motoren til at lave PCoA
-import plotly.graph_objects as go
 
 # -----------------------------------------------------------------------------
 # 1. KONFIGURATION
@@ -90,7 +84,7 @@ if data is None or data.empty:
 # 3. FANER (TABS)
 # -----------------------------------------------------------------------------
 
-tab1, tab2, tab3 = st.tabs(["Kort & Oversigt", "Tidsudvikling/Forskelle (Station)", "Forskelle"])
+tab1, tab2, tab3 = st.tabs(["Kort & Oversigt", "Tidsudvikling/Forskelle (Station)", "Substrat forskelle"])
 
 # =============================================================================
 # FANE 1: KORT & OVERSIGT
@@ -174,68 +168,8 @@ with tab1:
             config={'scrollZoom': True, 'displayModeBar': True}
         )
 
-        st.divider()
-
-        # --- SEKTION: HYPPIGHED OG UDBREDELSE ---
-        st.subheader("Arts-hyppighed og Udbredelse")
-        st.markdown("Venstre: Hvor mange *prøver* er arten fundet i? Højre: Hvor mange unikke *stationer* er arten fundet på?")
-
-        if not df_map.empty:
-            # Opret to kolonner til graferne
-            col_freq1, col_freq2 = st.columns(2)
-
-            # --- GRAF 1: ANTAL REGISTRERINGER (Venstre) ---
-            with col_freq1:
-                # Tæl rækker pr art
-                obs_counts = df_map['Art latin'].value_counts().reset_index()
-                obs_counts.columns = ['Art latin', 'Antal']
-                obs_counts = obs_counts.sort_values('Antal', ascending=True)
-                
-                hojde_obs = max(400, len(obs_counts) * 25)
-
-                with st.container(height=500):
-                    fig_obs = px.bar(
-                        obs_counts,
-                        x='Antal',
-                        y='Art latin',
-                        orientation='h',
-                        text_auto=True,
-                        title="Antal fund totalt (alle prøver)",
-                        labels={'Antal': 'Antal prøver', 'Art latin': 'Art'},
-                        height=hojde_obs
-                    )
-                    fig_obs.update_layout(yaxis_title="", margin=dict(l=10, r=10, t=30, b=10))
-                    st.plotly_chart(fig_obs, use_container_width=True)
-
-            # --- GRAF 2: ANTAL STATIONER (Højre) ---
-            with col_freq2:
-                # Tæl unikke StedID pr art
-                station_counts = df_map.groupby('Art latin')['StedID'].nunique().reset_index()
-                station_counts.columns = ['Art latin', 'Antal']
-                station_counts = station_counts.sort_values('Antal', ascending=True)
-                
-                hojde_stat = max(400, len(station_counts) * 25)
-
-                with st.container(height=500):
-                    fig_stat = px.bar(
-                        station_counts,
-                        x='Antal',
-                        y='Art latin',
-                        orientation='h',
-                        text_auto=True,
-                        title="Antal stationer (Udbredelse)",
-                        labels={'Antal': 'Antal stationer', 'Art latin': 'Art'},
-                        height=hojde_stat
-                    )
-                    # Vi beholder y-aksen (artsnavne) her også, da sorteringen kan være forskellig
-                    # (En art kan være fundet 100 gange på 1 station vs 10 gange på 10 stationer)
-                    fig_stat.update_layout(yaxis_title="", margin=dict(l=10, r=10, t=30, b=10))
-                    st.plotly_chart(fig_stat, use_container_width=True)
-
-        else:
-            st.info("Ingen data at vise.")
-            
-        st.divider()
+        # Bar Chart
+        st.subheader("Artsfordeling (Median for valgte data)")
         
 # Box Plot
         st.subheader("Artsfordeling (Boxplot)")
@@ -402,212 +336,90 @@ with tab2:
              st.dataframe(station_data)
 
 # =============================================================================
-# FANE 3: MILJØ, SUBSTRAT & GEOGRAFI ANALYSE
+# FANE 3: SUBSTRAT ANALYSE
 # =============================================================================
 with tab3:
-    st.subheader("Sammenlignende Analyse")
-    st.markdown("Undersøg forskelle i biodiversitet og artssammensætning.")
+    st.subheader("Sammenligning af Substrater (Prøvetype)")
+    st.markdown("Her undersøges forskelle mellem substraterne (f.eks. Sten, Tagrør, Andet).")
 
-    # --- 1. INDSTILLINGER (Gruppering & Metode) ---
-    c_opt1, c_opt2 = st.columns(2)
-    
-    with c_opt1:
-        analysis_mode = st.radio(
-            "1. Hvad vil du sammenligne?", 
-            ["Substrater (Sten, Tagrør...)", "Vandtype (Sø vs. Vandløb)", "Geografi (Landsdel)"],
-            horizontal=True
-        )
-        
-    with c_opt2:
-        metric_mode = st.radio(
-            "2. Hvilken metode?",
-            ["Bray-Curtis (Mængder)", "Jaccard (Artsliste)"],
-            horizontal=True,
-            help="Bray-Curtis vægter mængden af hver art. Jaccard kigger kun på, om arterne er til stede (God til geografi)."
-        )
-    
-    st.divider()
-
-    # --- FILTRE & DATAUDTRÆK ---
+    # --- LOKALE FILTRE FOR DENNE FANE ---
+    # Vi giver mulighed for at filtrere på Medie og År, da substrater kan variere mellem sø/vandløb
     c_sub1, c_sub2 = st.columns(2)
     with c_sub1:
-        if "Vandtype" in analysis_mode:
-            st.markdown(f"**Vælg Medie:** (Låst for sammenligning)")
-            sub_kilder = data['Kilde'].unique()
-        else:
-            sub_kilder = st.multiselect("Vælg Medie", options=data['Kilde'].unique(), default=data['Kilde'].unique(), key="sub_kilde")
-            
+        # Standardvalg: Begge medier
+        sub_kilder = st.multiselect("Vælg Medie (Substrat-analyse)", options=data['Kilde'].unique(), default=data['Kilde'].unique())
     with c_sub2:
-        sub_min = int(data['År'].min())
-        sub_max = int(data['År'].max())
-        if sub_min == sub_max:
-             sub_year_range = (sub_min, sub_max)
-        else:
-             sub_year_range = st.slider("Vælg Periode", sub_min, sub_max, (sub_min, sub_max), key="sub_aar")
+        # Standardvalg: Alle år
+        sub_min_year = int(data['År'].min())
+        sub_max_year = int(data['År'].max())
+        sub_year_range = st.slider("Vælg Periode (Substrat-analyse)", sub_min_year, sub_max_year, (sub_min_year, sub_max_year))
     
-    # Filtrer grunddata
+    # Opret datasæt til analysen
     df_sub = data.copy()
     df_sub = df_sub[df_sub['Kilde'].isin(sub_kilder)]
     df_sub = df_sub[(df_sub['År'] >= sub_year_range[0]) & (df_sub['År'] <= sub_year_range[1])]
-
-    # --- KONFIGURER LOGIK ---
-    if "Substrater" in analysis_mode:
-        group_col = 'Indsamlet prøve fra'
-        group_label = 'Substrat'
-        df_sub = df_sub[df_sub['Indsamlet prøve fra'] != 'Ukendt']
-
-    elif "Vandtype" in analysis_mode:
-        group_col = 'Kilde'
-        group_label = 'Vandtype'
-
-    elif "Geografi" in analysis_mode:
-        group_col = 'Region'
-        group_label = 'Landsdel'
-        
-        def assign_region(row):
-            lon = row['lon']
-            if lon < 9.9: return "Jylland"
-            elif 9.9 <= lon < 10.9: return "Fyn"
-            else: return "Sjælland/Øer"
-
-        if not df_sub.empty:
-            df_sub['Region'] = df_sub.apply(assign_region, axis=1)
+    
+    # Fjern prøver hvor substrat er ukendt
+    df_sub = df_sub[df_sub['Indsamlet prøve fra'] != 'Ukendt']
 
     if df_sub.empty:
         st.warning("Ingen data fundet med de valgte filtre.")
     else:
+        st.divider()
         
-        # --- ANALYSE 1: DIVERSITET (BOXPLOT) ---
-        st.subheader(f"1. Diversitet (Artsrigdom pr. {group_label})")
+        # --- ANALYSE 1: DIVERSITET (Artsrigdom) ---
+        st.markdown("### 1. Diversitet: Hvor mange arter findes pr. prøve?")
+        st.markdown("Grafen viser spredningen i antallet af arter fundet på hvert substrat.")
         
-        richness = df_sub.groupby(['StedID', 'Dato', group_col])['Art latin'].nunique().reset_index()
-        richness.columns = ['StedID', 'Dato', 'Gruppe', 'Antal_Arter']
-        richness = richness.sort_values('Gruppe')
+        # Beregn antal arter pr. prøve (En prøve er unik pr. StedID + Dato + Substrat)
+        # Vi tæller unikke 'Art latin'
+        richness = df_sub.groupby(['StedID', 'Dato', 'Indsamlet prøve fra'])['Art latin'].nunique().reset_index()
+        richness.columns = ['StedID', 'Dato', 'Substrat', 'Antal_Arter']
+        
+        # Sorter rækkefølgen (valgfrit)
+        richness = richness.sort_values('Substrat')
 
         fig_div = px.box(
-            richness, x='Gruppe', y='Antal_Arter', color='Gruppe', points='outliers', 
-            title=f"Artsrigdom: {group_label}",
-            labels={'Antal_Arter': 'Antal Arter pr. prøve', 'Gruppe': group_label},
+            richness,
+            x='Substrat',
+            y='Antal_Arter',
+            color='Substrat',
+            points='outliers', # Viser outliers som prikker. Brug 'all' for at se alle punkter.
+            title="Artsrigdom pr. Substrat",
+            labels={'Antal_Arter': 'Antal Arter pr. prøve', 'Substrat': 'Substrat type'},
             height=500
         )
         st.plotly_chart(fig_div, use_container_width=True)
-
+        
+        # --- ANALYSE 2: ARTS-PRÆFERENCE ---
         st.divider()
-
-        # --- ANALYSE 2: ORDINATION (PCoA) ---
-        # Bestem titel og forklaring baseret på valg
-        if "Jaccard" in metric_mode:
-            pcoa_title = f"PCoA (Jaccard - Artsliste)"
-            pcoa_desc = "Analysen er baseret på **Jaccard**. Den ser kun på, om arter er til stede (1) eller ej (0)."
-            calc_metric = 'jaccard'
-        else:
-            pcoa_title = f"PCoA (Bray-Curtis - Mængder)"
-            pcoa_desc = "Analysen er baseret på **Bray-Curtis**. Den vægter arter med høj forekomst tungere."
-            calc_metric = 'braycurtis'
-
-        st.subheader(f"2. Artssammensætning ({pcoa_title})")
-        st.markdown(pcoa_desc)
+        st.markdown("### 2. Arts-præference: Er der forskel på artssammensætningen?")
+        st.markdown("Grafen viser den gennemsnitlige relative forekomst for de mest almindelige arter, opdelt på substrat.")
         
-        # Dataklargøring
-        df_sub['SampleID'] = df_sub['StedID'].astype(str) + "_" + df_sub['Dato'].astype(str) + "_" + df_sub[group_col].astype(str)
-        pivot_data = df_sub.pivot_table(index='SampleID', columns='Art latin', values='Relativ_Forekomst', fill_value=0)
+        # 1. Find de N mest almindelige arter i det filtrerede datasæt (for at undgå rod)
+        top_n_sub = 15
+        top_species_list = df_sub.groupby('Art latin')['Relativ_Forekomst'].sum().nlargest(top_n_sub).index.tolist()
         
-        if len(pivot_data) < 3:
-            st.warning("For få prøver til at lave PCoA (kræver mindst 3).")
-        else:
-            try:
-                # --- FORBERED DATA TIL JACCARD VS BRAY-CURTIS ---
-                if "Jaccard" in metric_mode:
-                    # Til Jaccard konverterer vi til binær (0 eller 1)
-                    # Alt over 0 bliver til 1
-                    data_for_dist = (pivot_data > 0).astype(int)
-                else:
-                    # Til Bray-Curtis bruger vi de relative mængder
-                    data_for_dist = pivot_data
-
-                # Beregn Afstand
-                dist_matrix = pdist(data_for_dist, metric=calc_metric)
-                dist_square = squareform(dist_matrix)
-                
-                # Kør PCoA (MDS)
-                mds = MDS(n_components=2, dissimilarity='precomputed', random_state=42, n_init=4, max_iter=300)
-                coords = mds.fit_transform(dist_square)
-                
-                pcoa_df = pd.DataFrame(data=coords, columns=['PCoA1', 'PCoA2'], index=pivot_data.index)
-                
-                meta_data = df_sub.groupby('SampleID')[group_col].first()
-                pcoa_df['Gruppe'] = meta_data.reindex(pcoa_df.index)
-                
-                centroids = pcoa_df.groupby('Gruppe')[['PCoA1', 'PCoA2']].mean().reset_index()
-
-                # Basis Plot
-                fig_pcoa = px.scatter(
-                    pcoa_df, x='PCoA1', y='PCoA2', color='Gruppe',
-                    title=pcoa_title, hover_name=pcoa_df.index, opacity=0.5, height=650,
-                    labels={'Gruppe': group_label}
-                )
-
-                # Tegn Centroids
-                import plotly.graph_objects as go 
-                for i, row in centroids.iterrows():
-                    fig_pcoa.add_trace(go.Scatter(
-                        x=[row['PCoA1']], y=[row['PCoA2']], mode='markers+text',
-                        marker=dict(size=20, symbol='cross', line=dict(width=2, color='black')),
-                        name=f"GNS: {row['Gruppe']}", text=[f"<b>{row['Gruppe']}</b>"], textposition="top center"
-                    ))
-
-                # Beregn Pile (Korrelation)
-                # Vi beregner altid korrelation mod de oprindelige mængder (pivot_data) 
-                # for at se hvilke arter der er hyppige, selvom vi kører Jaccard.
-                np.seterr(divide='ignore', invalid='ignore')
-                correlations = []
-                for art in pivot_data.columns:
-                    abundance = pivot_data[art]
-                    if abundance.std() > 0:
-                        corr_x = np.corrcoef(abundance, pcoa_df['PCoA1'])[0, 1]
-                        corr_y = np.corrcoef(abundance, pcoa_df['PCoA2'])[0, 1]
-                        if not np.isnan(corr_x) and not np.isnan(corr_y):
-                            length = (corr_x**2 + corr_y**2)**0.5
-                            correlations.append({'Art': art, 'x': corr_x, 'y': corr_y, 'Length': length})
-                np.seterr(all='warn')
-
-                if correlations:
-                    corr_df = pd.DataFrame(correlations)
-                    top_vectors = corr_df.nlargest(8, 'Length')
-                    
-                    max_x = max(pcoa_df['PCoA1'].abs().max(), 0.1)
-                    max_y = max(pcoa_df['PCoA2'].abs().max(), 0.1)
-                    scale_factor_x = max_x * 1.2
-                    scale_factor_y = max_y * 1.2
-
-                    for index, row in top_vectors.iterrows():
-                        x_vec = row['x'] * scale_factor_x
-                        y_vec = row['y'] * scale_factor_y
-                        fig_pcoa.add_shape(type='line', x0=0, y0=0, x1=x_vec, y1=y_vec, line=dict(color="red", width=2))
-                        fig_pcoa.add_annotation(x=x_vec, y=y_vec, text=row['Art'], showarrow=False, xanchor="center", yanchor="bottom", font=dict(color="darkred", size=14, family="Arial Black"))
-
-                st.plotly_chart(fig_pcoa, use_container_width=True)
-            except Exception as e:
-                st.error(f"Fejl i PCoA: {e}")
-
-        st.divider()
-
-        # --- ANALYSE 3: HEATMAP ---
-        st.subheader(f"3. Arts-præference ({group_label})")
+        # 2. Filtrer data til kun at indeholde disse arter
+        df_top = df_sub[df_sub['Art latin'].isin(top_species_list)].copy()
         
-        top_n_pref = 30
-        top_species_total = df_sub.groupby('Art latin')['Relativ_Forekomst'].sum().nlargest(top_n_pref).index.tolist()
-        df_pref = df_sub[df_sub['Art latin'].isin(top_species_total)].copy()
-
-        avg_abundance = df_pref.groupby(['Art latin', group_col])['Relativ_Forekomst'].mean().unstack(fill_value=0)
-        row_normalized = avg_abundance.div(avg_abundance.sum(axis=1), axis=0) * 100
+        # 3. Beregn gennemsnitlig (eller median) relativ forekomst pr. substrat for disse arter
+        # Vi grupperer på Substrat og Art
+        preference = df_top.groupby(['Indsamlet prøve fra', 'Art latin'])['Relativ_Forekomst'].mean().reset_index()
         
-        if not row_normalized.empty:
-            first_col = row_normalized.columns[0]
-            row_normalized = row_normalized.sort_values(first_col, ascending=False)
-            fig_heat = px.imshow(
-                row_normalized, labels=dict(x=group_label, y="Art", color="Affinitet (%)"),
-                x=row_normalized.columns, y=row_normalized.index,
-                color_continuous_scale="RdBu_r", aspect="auto", height=800
-            )
-            st.plotly_chart(fig_heat, use_container_width=True)
+        # 4. Lav Grouped Bar Chart
+        fig_pref = px.bar(
+            preference,
+            x='Art latin',
+            y='Relativ_Forekomst',
+            color='Indsamlet prøve fra',
+            barmode='group', # VIGTIGT: Dette sætter søjlerne ved siden af hinanden
+            title=f"Top {top_n_sub} arters fordeling på substrater (Gennemsnit)",
+            labels={'Relativ_Forekomst': 'Gns. Relativ Forekomst (%)', 'Indsamlet prøve fra': 'Substrat'},
+            height=600
+        )
+        fig_pref.update_layout(xaxis_tickangle=-45)
+        
+
+        st.plotly_chart(fig_pref, use_container_width=True)
+
