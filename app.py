@@ -90,7 +90,7 @@ if data is None or data.empty:
 # 3. FANER (TABS)
 # -----------------------------------------------------------------------------
 
-tab1, tab2, tab3 = st.tabs(["Kort & Oversigt", "Tidsudvikling/Forskelle (Station)", "Substrat forskelle"])
+tab1, tab2, tab3 = st.tabs(["Kort & Oversigt", "Tidsudvikling/Forskelle (Station)", "Forskelle"])
 
 # =============================================================================
 # FANE 1: KORT & OVERSIGT
